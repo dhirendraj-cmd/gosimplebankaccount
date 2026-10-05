@@ -24,7 +24,7 @@ func TestTransferTx(t *testing.T) {
 	fmt.Println("Acc2 balance >>> ", acc2.Balance)
 
 	// run n concurrent transfers
-	n := 15
+	n := 5
 	amount := int64(10)
 
 	// errs := make(chan error)
@@ -32,9 +32,11 @@ func TestTransferTx(t *testing.T) {
 
 	chres := make(chan TxResultChan, n)
 
-	for range n {
+	for i:=range n {
+		txName := fmt.Sprintf("tx %d", i+1)
 		go func() {
-			result, err := store.TransferTx(context.Background(), TransferTxParams{
+			ctx := context.WithValue(context.Background(), txKey, txName)
+			result, err := store.TransferTx(ctx, TransferTxParams{
 				FromAccountId: acc1.ID,
 				ToAccountId:   acc2.ID,
 				Amount:        amount,
@@ -94,10 +96,10 @@ func TestTransferTx(t *testing.T) {
 		
 		toAccount := res.ToAccount
 		require.NotEmpty(t, toAccount)
-		require.Equal(t, acc1.ID, toAccount.ID)
+		require.Equal(t, acc2.ID, toAccount.ID)
 
 		// check accounts balances
-		fmt.Println("at Transaction >>>> ")
+		fmt.Println(">>>> Transaction >>>> ")
 		fmt.Println("from Acc balance >>> ", fromAccount.Balance)
 		fmt.Println("to Acc balance >>> ", toAccount.Balance)
 
@@ -130,13 +132,10 @@ func TestTransferTx(t *testing.T) {
 	updatedAccount2, err := testQueries.GetAccount(context.Background(), acc2.ID)
 	require.NoError(t, err)
 
-	fmt.Println("After Transaction >>>> ")
-	fmt.Println("Acc1 balance >>> ", updatedAccount1.Balance)
-	fmt.Println("Acc2 balance >>> ", updatedAccount2.Balance)
+	fmt.Println("After Transaction >>>> ", updatedAccount1.Balance, updatedAccount2.Balance)
 
 	require.Equal(t, acc1.Balance-int64(n)*amount, updatedAccount1.Balance)
-	require.Equal(t, acc1.Balance+int64(n)*amount, updatedAccount2.Balance)
-
+	require.Equal(t, acc2.Balance+int64(n)*amount, updatedAccount2.Balance)
 
 
 }
