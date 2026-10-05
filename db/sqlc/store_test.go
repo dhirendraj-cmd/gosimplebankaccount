@@ -139,3 +139,57 @@ func TestTransferTx(t *testing.T) {
 
 
 }
+
+
+// Deadlock prevention/minimise chances
+func TestTransferTxDeadlock(t *testing.T) {
+	store := NewStore(testDB)
+
+	acc1 := CreateRandomAccount(t)
+	acc2 := CreateRandomAccount(t)
+	fmt.Println(">> before:", acc1.Balance, acc2.Balance)
+
+	// run n concurrent transfers
+	n := 10
+	amount := int64(10)
+	errs := make(chan error)
+
+	for i:=range n {
+		fromAccountID := acc1.ID
+		toAccountID := acc2.ID
+
+		if i%2 == 1 {
+			fromAccountID = acc2.ID
+			toAccountID = acc1.ID
+		}
+
+		go func() {
+			_, err := store.TransferTx(context.Background(), TransferTxParams{
+				FromAccountId: 	fromAccountID,
+				ToAccountId:  	toAccountID,
+				Amount:        amount,
+			})
+
+			errs <- err
+		}()
+	}
+
+	for i := 0; i < n; i++ {
+		err := <-errs
+		require.NoError(t, err)
+	}
+
+	// check final updated balance
+	updatedAccount1, err := testQueries.GetAccount(context.Background(), acc1.ID)
+	require.NoError(t, err)
+
+	updatedAccount2, err := testQueries.GetAccount(context.Background(), acc2.ID)
+	require.NoError(t, err)
+
+	fmt.Println("After Transaction >>>> ", updatedAccount1.Balance, updatedAccount2.Balance)
+
+	require.Equal(t, acc1.Balance, updatedAccount1.Balance)
+	require.Equal(t, acc2.Balance, updatedAccount2.Balance)
+
+
+}
